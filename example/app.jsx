@@ -5,114 +5,127 @@ import picasso from 'picasso.js';
 import picassoQ from 'picasso-plugin-q';
 import usePromise from 'react-use-promise';
 import { useModel, useLayout, usePicasso } from '../src/index';
-import script from './data';
 
-const props = {
+
+const object = {
   qInfo: {
-    qType: 'visualization',
-    qId: '',
+    qType: 'measure',
+    qId: 'barChartExample'
   },
-  type: 'my-picasso-chart',
-  labels: true,
+  type: 'my-picasso-barChart',
   qHyperCubeDef: {
-    qDimensions: [{
-      qDef: {
-        qFieldDefs: ['movie'],
-        qSortCriterias: [{
-          qSortByAscii: 1,
-          qSortByLoadOrder: 1,
-        }],
-      },
-    }],
-    qMeasures: [{
-      qDef: {
-        qDef: 'Count(word)',
-      },
-      qSortBy: {
-        qSortByLoadOrder: 1,
-        qSortByNumeric: -1,
-      },
-    },
+    qDimensions: [
+      {
+        labels: true,
+        qDef: {
+          qFieldDefs: [
+            'Rating'
+          ],
+          qSortCriterias: [
+            {
+              qSortByAscii: 1
+            }
+          ]
+        }
+      }
     ],
-    qInitialDataFetch: [{
-      qTop: 0, qHeight: 500, qLeft: 0, qWidth: 17,
-    }],
-    qSuppressZero: false,
-    qSuppressMissing: false,
+    qMeasures: [
+      {
+        labels: true,
+        qDef: {
+          qLabel: 'Votes',
+          qDef: 'Votes',
+          autoSort: true
+        }
+      }
+    ],
+    qInitialDataFetch: [
+      {
+        qHeight: 15,
+        qWidth: 2
+      }
+    ]
+  }
+}
+
+const chartSettings = {
+  scales: {
+    labels: 'true',
+    y: {
+      data: { field: 'Votes' },
+      invert: true,
+      include: [0]
+    },
+
+    t: { data: { extract: { field: 'Rating' } }, padding: 0.3 },
   },
+  components: [{
+    type: 'axis',
+    dock: 'left',
+    scale: 'y'
+  }, {
+    type: 'axis',
+    dock: 'bottom',
+    scale: 't'
+  }, {
+    key: 'bars',
+    type: 'box',
+    data: {
+      extract: {
+        field: 'Rating',
+        props: {
+          start: 0,
+          end: { field: 'Votes' }
+        }
+      }
+    },
+    settings: {
+      major: { scale: 't' },
+      minor: { scale: 'y' }
+    }
+  },
+  {
+    type: 'text',
+    text: 'Rating Score',
+    layout: {
+      dock: 'bottom'
+    }
+  },
+  {
+    type: 'text',
+    text: 'Number of Votes',
+    layout: {
+      dock: 'left'
+    }
+  }]
 };
 
-const settings = {
-  scales: {
-    x: {
-      data: { extract: { field: 'qDimensionInfo/0', props: { name: { field: 'qDimensionInfo/0', label: v => v.qText } } } },
-      padding: 0.2,
-    },
-    y: {
-      data: { field: 'qMeasureInfo/0' },
-      include: [0],
-      invert: true,
-      ticks: { values: [0, 100, 200, 300, 400, 500] },
-    },
-    color: {
-      data: { extract: { field: 'qDimensionInfo/0' } },
-      type: 'color',
-    },
-  },
-  components: [
-    { type: 'axis', dock: 'left', scale: 'y' },
-    { type: 'axis', dock: 'bottom', scale: 'x' },
-    { type: 'text', text: 'Total swear word usage per movie', dock: 'top' },
-    { type: 'text', text: 'Total swear word', dock: 'left' },
-    { type: 'text', text: 'Movie', dock: 'bottom' },
-    {
-      key: 'bars',
-      type: 'box',
-      data: {
-        extract: {
-          field: 'qDimensionInfo/0',
-          props: {
-            start: 0,
-            end: { field: 'qMeasureInfo/0' },
-          },
-        },
-      },
-      settings: {
-        major: { scale: 'x' },
-        minor: { scale: 'y' },
-        box: {
-          maxWidthPx: 200,
-          fill: { scale: 'color' },
-          strokeWidth: 1,
-        },
-      },
-      brush: {
-        trigger: [{
-          on: 'tap',
-          contexts: ['highlight'],
-        }],
-        consume: [{
-          context: 'highlight',
-          style: {
-            inactive: {
-              opacity: 0.3,
-            },
-          },
-        }],
-      },
-    }],
-};
+const loadscript = `Stars:
+LOAD * INLINE 
+[
+Rating,Votes,
+10,3404,
+9,2234,
+8,6243,
+7,13785,
+6,20325,
+5,18046,
+4,10179,
+3,5844,
+2,3244,
+1,3208
+];`
 
 const useGlobal = session => usePromise(() => session.open(), [session]);
 
-function useSessionApp(global) {
+function useSessionApp(QIX) {
   const [sessionApp] = usePromise(async () => {
-    if (!global) return null;
-    const app = await global.createSessionApp();
-    await app.setScript(script);
+    if (!QIX) return null;
+    const app = await QIX.createSessionApp();
+    await app.setScript(loadscript);
     await app.doReload();
     return app;
-  }, [global]);
+  }, [QIX]);
   return sessionApp;
 }
 
@@ -125,24 +138,15 @@ export default function App() {
   // we need to use the useMemo hook to avoid creating new enigma.js sessions each time.
   const session = useMemo(() => enigma.create({ schema, url: 'ws://localhost:9076/app' }), [false]);
   // open the session.
-  const [global] = useGlobal(session);
+  const [QIX] = useGlobal(session);
   // create session app, set load script and reload.
-  const app = useSessionApp(global);
+  const app = useSessionApp(QIX);
   // fetch the model
-  const [model, modelError] = useModel(app, props);
+  const [model, modelError] = useModel(app, object);
   // fetch the layout.
   const [layout, layoutError] = useLayout(model);
   // render picasso chart.
-  const pic = usePicasso(element, settings, layout);
-
-  // we want to start with one value highlighted in the chart.
-  useEffect(() => {
-    if (!pic) return;
-    // access the brush instance
-    const highlighter = pic.brush('highlight');
-    // highlight a value
-    highlighter.addValue('qHyperCube/qDimensionInfo/0', 1);
-  }, [pic]);
+  usePicasso(element, chartSettings, layout);
 
   let msg = '';
   if (!app) {
